@@ -1,0 +1,161 @@
+Udemy: Helm Kubernetes Packaging Manager for Developers and DevOps
+
+
+- Kubernetes has multiple yaml files to manager to handle a simple application with deployments, services, configmaps.. 
+- Most of these files have static data
+- Version Management for all these files difficult to handle.
+- Tracking/deleting these individual components is difficult
+
+- Helm is a Package Manager
+- simplifies kubernetes deployment
+- Dynamic Configuration
+- consistency - what is there is helm chart is on the kubernetes cluster
+- intelligent Deployments - order of resources
+- Lifecycle Hooks - to had hooks
+
+
+
+CMD:
+helm install apache bitnami/apache --namespace=dev
+helm upgrade apache bitnami/apache --namespace=dev      // Only upgraded kubernetes files will be updates.. 
+helm rollback apache 1 --namespace=dev              // to rollback to a previous version
+helm uninstall apache
+helm repo list
+heml search repo <<helm name>> --versions
+heml repo remove bitname
+helm repo add bitnami https://charts.bitnami.com/bitnami
+helm status <<helm name>>
+helm install apache bitnami/apache --namespace=dev --set <<variable1>>=<<value>>
+helm ls                             // to list the helm charts in the default namespace
+helm get notes <<helm name>>        // to get the inital notes of the helm install
+helm get values <<helm name>>       // to get the values used in the helm chart
+helm get values <<helm name>> --all  // to get all the variables and values including default
+helm get values <<helm name>> revision <<revision number>>  // specific revision value details
+helm get manifest <<helm name>>           //to get all the template yaml files
+helm history <<helm name>>                   // to get the complete helm history notes even with errors
+helm rollback <<helm name>> <<revision number>>   // to get back to any revision number, create a new secret entry and also updates the helm history
+helm uninstall <<helm name>>  --keep-history       // to uninstall the current helm chart but keep the history information, this can be used to rollback when need
+helm install <<helm name>> <<helm repository>> --namespace dev  --create-namespace   // to create namespace as the helm chart is installed
+helm upgrade --install <<helm name>> <<helm repository>>  // to install new helm chart if present it will upgrade
+helm install <<helm repository>> --generate-name     //for the system to install helm chart with a default name
+helm install <<helm repository>> --generate-name --name-template "myweb-{{randAlpha 7 | lower}}"    // to generate helm name with a template
+helm install <<helm name>> <<helm repository>> --wait --timeout 1m5s     // need to wait specific time before timeout (5 mins default timeout)
+helm install <<helm name>> <<helm repository>. --atomic   // to not to fail helm and rollback to previous version
+helm package <<helm name>>                    // to create a .tgz file for the complete chart
+helm lint <<helm name>>                  // for doing the syntax check
+
+- Two deployment name cant be same for a single namespace
+- If no changes are done on the yaml file helm will not deploy any new changes when the upgrade is run
+- All the release information(Versioning) of the helm is stored in secrets
+- helm chart name should always be lower case as kubernetes will not be able to create few objects with uppercase
+
+
+helm install steps
+- load the chart and its dependencies
+- parse the values.yaml
+- generate the yaml
+- parse the yaml to kube objects and validate(connects with kube control API)
+- Generate Yaml (Manifest file) and send to Kube for creation
+
+helm install OR update <<helm name>> <<respository>> --set <<variable>>=<<value>> --dry-run  // to get the yaml files with variables - cant use these yaml files for creating kubectl objects
+
+helm template <<helm name>> <<respository>> --values=<<values.yaml path>>   // to get the templates - can use to create kubectl objects
+
+Note:  Templates doesnt do the validates by calling the kube control API for the yaml but --dry-run connects with kube control API to validate the yaml along with syntax
+
+helm create <<helm name>>           //creates an empty chart with chart.yaml(which has the helm chart metadata), Chart folder(if current chart is dependent on other charts), templates folder(for all the kubernetes templates), values.yaml(for defining specific values) 
+By default NGINX chart would be used 
+
+
+Chart.yaml
+*************
+apiVersion: v2                         //Mandatory
+name: <<helm name>>                    //Mandatory
+description: <<helm details>>
+icon: <<logo>>                            // jpg 
+keywords:
+  - <<tags>>
+  - <<tags>>
+home:  <<url of project>>
+source: 
+  - <<url of project source>>
+  - <<url of project source>>
+maintainers:
+  - name:  << people>>
+    email:  <<email>> 
+type: application OR library            //library - reusable helm charts without templates folder used to refer in other charts
+version: 0.1.0                           // Mandatory - helm version - when updates increase it
+appVersion: "4.9"                         //Application version
+dependencies:                              // to download helm charts and install along with the application 
+ - name:  mysql
+   version: "8.8.6"
+   repository: "http://charts.bitnami.com/bitnami
+
+CMD:
+helm dependency update <<helm chart>>    // it would bring the helm tfg file from the repository and place it in charts folder.
+helm install <<helm name>> <<repository>>  // it would install the application along with the dependencies
+
+
+
+
+
+Templates folder
+****************
+- contains .yaml files for which will be used to create manifest yaml file for create kube control objects
+- also contains _helper.tpl - template files which contains methods used in yaml files
+- These methods can be invoked by calling "include <<methodname>> ." where include is a cmd which takes method name and "." as parameters
+- uses go language in the templates
+
+{{- "asdf"}}  // "-" to remove the spaces before and after
+.values.autoscalling.enables - "." to refer to root
+functions -  nindent, default, toYaml
+conditions
+{{- if .values.enabled }}
+{{- else}}
+{{- end}}
+{{- if and .values.enabled .values.data}}
+{{- end}}
+
+{{- with .values.ingress.annotations}}         // with is used for list conditioning
+{{- toYaml . | nindent 4}}                     // "." refers to complete list
+{{- else}}
+{{- end}}
+
+{{ $myFLAG = .values.my.flag}}                  // to assign a value to a variable and use it in program
+{{- if $myFLAG}}
+Note: the variable time will not changes once it is assigned.. i.e we can use $myFLAG = true(boolean type but no $myFLAG = "test" (string)
+
+{{- range. Values.my.values}}                 // to loop through the list of items "." scope is an item in the list
+  {{. | upper}}
+{{- end}}
+
+{{- range $key,$value := .Values.image}}     // loop through Dictionary and assign the variable and value
+  {{$key}}: {{$values}}
+{{- end}}
+
+{{- define "firstchart.mytemplate" -}}         // define a function 
+{{- .Values.myvalue}}
+{{- end}}
+
+{{- include "firstchart.mytemplate" . | lower }}         // function call with include - can pass the output to other existing functions
+
+{{- template "firstchart.mytemplate" .}}                // function call with template - cant pipe the output
+
+values.yaml
+************
+contains the variables and values.
+these variables are used by {{.values.<<variablename>>}}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
