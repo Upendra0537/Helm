@@ -5,13 +5,13 @@ Udemy: Helm Kubernetes Packaging Manager for Developers and DevOps
 - Most of these files have static data
 - Version Management for all these files difficult to handle.
 - Tracking/deleting these individual components is difficult
-
 - Helm is a Package Manager
 - simplifies kubernetes deployment
 - Dynamic Configuration
 - consistency - what is there is helm chart is on the kubernetes cluster
 - intelligent Deployments - order of resources
 - Lifecycle Hooks - to had hooks
+- Security can be enfored on helm charts from the provider by adding a signature with PGP(private key) when the helm charts are packaged and sharing the public key with the user to verify the signature when they install it
 
 
 
@@ -25,13 +25,13 @@ heml search repo <<helm name>> --versions
 heml repo remove bitname
 helm repo add bitnami https://charts.bitnami.com/bitnami
 helm status <<helm name>>
-helm install apache bitnami/apache --namespace=dev --set <<variable1>>=<<value>>
+helm install apache bitnami/apache --namespace=dev --set <<variable1>>=<< value>>
 helm ls                             // to list the helm charts in the default namespace
 helm get notes <<helm name>>        // to get the inital notes of the helm install
 helm get values <<helm name>>       // to get the values used in the helm chart
 helm get values <<helm name>> --all  // to get all the variables and values including default
 helm get values <<helm name>> revision <<revision number>>  // specific revision value details
-helm get manifest <<helm name>>           //to get all the template yaml files
+helm get manifest <<helm name>>           //to get all the template yaml files for the installation which already happened
 helm history <<helm name>>                   // to get the complete helm history notes even with errors
 helm rollback <<helm name>> <<revision number>>   // to get back to any revision number, create a new secret entry and also updates the helm history
 helm uninstall <<helm name>>  --keep-history       // to uninstall the current helm chart but keep the history information, this can be used to rollback when need
@@ -61,7 +61,7 @@ helm install OR update <<helm name>> <<respository>> --set <<variable>>=<<value>
 
 helm template <<helm name>> <<respository>> --values=<<values.yaml path>>   // to get the templates - can use to create kubectl objects
 
-Note:  Templates doesnt do the validates by calling the kube control API for the yaml but --dry-run connects with kube control API to validate the yaml along with syntax
+Note:  Templates doesnt do the validates by calling the kube control API for the yaml but --dry-run connects with kube control API to validate the yaml along with syntax and Schema 
 
 helm create <<helm name>>           //creates an empty chart with chart.yaml(which has the helm chart metadata), Chart folder(if current chart is dependent on other charts), templates folder(for all the kubernetes templates), values.yaml(for defining specific values) 
 By default NGINX chart would be used 
@@ -90,13 +90,20 @@ dependencies:                              // to download helm charts and instal
  - name:  mysql
    version: "8.8.6"
    repository: "http://charts.bitnami.com/bitnami
+   condition: .values.enabled              // to specify the conditions for the dependency or use "tags" to specify the conditions
+   import-values:                           // is to import the values from the child charts which have exported the values   
+     - services
+   import-values:                          // another way of import values from child charts from theirs Values.xml without export keywork. 
+     - child: primary.service              // these values can be access my .Values.mysqlservice.type  (where type is under service in child chart)
+       parent: mysqlservice
+
 
 CMD:
 helm dependency update <<helm chart>>    // it would bring the helm tfg file from the repository and place it in charts folder.
 helm install <<helm name>> <<repository>>  // it would install the application along with the dependencies
 
-
-
+Notes:
+- we can change the default values of the dependencies chart by passing them in values.yml file.
 
 
 Templates folder
@@ -107,21 +114,21 @@ Templates folder
 - uses go language in the templates
 
 {{- "asdf"}}  // "-" to remove the spaces before and after
-.values.autoscalling.enables - "." to refer to root
+.Values.autoscalling.enables - "." to refer to root
 functions -  nindent, default, toYaml
 conditions
-{{- if .values.enabled }}
+{{- if .Values.enabled }}
 {{- else}}
 {{- end}}
-{{- if and .values.enabled .values.data}}
+{{- if and .Values.enabled .values.data}}
 {{- end}}
 
-{{- with .values.ingress.annotations}}         // with is used for list conditioning
+{{- with .Values.ingress.annotations}}         // with is used for list conditioning
 {{- toYaml . | nindent 4}}                     // "." refers to complete list
 {{- else}}
 {{- end}}
 
-{{ $myFLAG = .values.my.flag}}                  // to assign a value to a variable and use it in program
+{{ $myFLAG = .Values.my.flag}}                  // to assign a value to a variable and use it in program
 {{- if $myFLAG}}
 Note: the variable time will not changes once it is assigned.. i.e we can use $myFLAG = true(boolean type but no $myFLAG = "test" (string)
 
@@ -134,19 +141,81 @@ Note: the variable time will not changes once it is assigned.. i.e we can use $m
 {{- end}}
 
 {{- define "firstchart.mytemplate" -}}         // define a function 
-{{- .Values.myvalue}}
+{{- default .Chart.Name .Values.myvalue}}
 {{- end}}
 
 {{- include "firstchart.mytemplate" . | lower }}         // function call with include - can pass the output to other existing functions
 
 {{- template "firstchart.mytemplate" .}}                // function call with template - cant pipe the output
 
+************
+hookpod.yaml   // Created to configure hook 
+************
+apiVersion: v1
+kind: pod
+metadata:
+  name: hooks
+  annotations:
+    "helm.sh/hook": pre-install                            // when the hook should be running
+    "helm.sh/hook-weight": "1"                             // priority of the hook when there are multiple hooks
+    "helm.sh/hook-delete-policy": hook-succeeded           // what is the hook deletion policy
+spec:
+  containers:
+    - name: busybox
+      image: busybox
+
+
+Hooks Options
+pre-install
+post-install
+pre-delete
+post-delete
+pre-upgrade
+post-upgrade
+pre-rollback
+post-rollback
+test
+
+hooks weight - any integer - asending order 
+
+hooks delete policy 
+before-hook-creation   // default - deletes any hooks which was created by prior helm install
+hook-succeeded
+hook-failed
+
+************
+tests folder //used to test any details - we should the helm installed. need to delete it seperately doesnt get removed with helm uninstall
+************
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test
+  annotations:
+  "helm.sh/hook": test               // "test" keyword to enable test
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['wget']
+
+CMD
+helm install <<release>> <<release path>>
+helm test <<release>>                                 // outputs the status of the test and leaves the pod to review
+
+
+
+
 values.yaml
 ************
 contains the variables and values.
-these variables are used by {{.values.<<variablename>>}}
+these variables are used by {{.Values.<<variablename>>}}
 
 
+Chart.lock
+*********
+- contains the version of the dependencies chart which is pulled based on the version criteria specified.
+- gets generated when we run "helm upate dependencu <<helm chart>>"
+= or >= or <= or ^ - for next major version or ~ - for the next minor version 
 
 
 
