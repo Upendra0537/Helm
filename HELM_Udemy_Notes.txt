@@ -211,20 +211,21 @@ contains the variables and values.
 these variables are used by {{.Values.<<variablename>>}}
 
 
-Chart.lock
+Chart.locks
 *********
 - contains the version of the dependencies chart which is pulled based on the version criteria specified.
 - gets generated when we run "helm upate dependencu <<helm chart>>"
 = or >= or <= or ^ - for next major version or ~ - for the next minor version 
 
 
+Starter -  used to create templates specific to a use case.
 
+- setup HELM_DATA_HOME =>  helm env HELM_DATA_HOME
+- copy all the helm charts to the HELM_DATA_HOME location 
+- replace the existing chart name with "<CHARTNAME>" in all the yaml files
+- run "helm create --starter <<helm folder>> <<helm chart name>>
 
+Plugins - used to install plugins in Helm - these can be shell scripts which we want to run in helm 
 
-
-
-
-
-
-
+Validation -  can setup specific schema validations for the values.xml by creating "values.schema.json" file. These constrains will be evaluated when the helm upgrade/template/install/lint runs
 
